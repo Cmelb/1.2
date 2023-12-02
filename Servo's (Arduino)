@@ -1,0 +1,176 @@
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+#include <Servo.h>
+#include <NewPing.h> // Library for ultrasonic sensor
+
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+
+const int button1Pin = 2; // Connect button 1 to digital pin 2
+const int button2Pin = 3; // Connect button 2 to digital pin 3
+const int button3Pin = 4; // Connect button 3 to digital pin 4
+const int button4Pin = 7;
+const int servo1Pin = 0;  // Connect servo 1 to channel 0 on the servo driver
+const int servo2Pin = 1;  // Connect servo 2 to channel 1 on the servo driver
+const int servo3Pin = 2;  // Connect servo 3 to channel 2 on the servo driver
+
+int servo1Angle = 0; // Initial angle for servo 1
+int servo2Angle = 100; // Initial angle for servo 2
+int servo3Angle = 120; // Initial angle for servo 3
+
+bool button1State = LOW;
+bool button2State = LOW;
+bool button3State = LOW;
+//bool button4State = LOW;
+bool lastButton1State = LOW;
+bool lastButton2State = LOW;
+bool lastButton3State = LOW;
+unsigned long lastDebounceTime = 0;
+unsigned long debounceDelay = 50;
+
+Servo horizontalServo;
+Servo verticalServo;
+
+const int triggerPin = 5; // Ultrasonic sensor trigger pin
+const int echoPin = 6;    // Ultrasonic sensor echo pin
+ // Push button pin for radar activation
+
+int horizontalAngle = 0;  // Initial horizontal angle
+int verticalAngle = 90;   // Initial vertical angle
+
+bool radarActive = false;
+
+NewPing sonar(triggerPin, echoPin); // Create a NewPing object for the ultrasonic sensor
+
+void setup() {
+  pinMode(button1Pin, INPUT_PULLUP);
+  pinMode(button2Pin, INPUT_PULLUP);
+  pinMode(button3Pin, INPUT_PULLUP);
+  pinMode(button4Pin, INPUT_PULLUP); // Set button 4 as input with internal pull-up resistor
+  pwm.begin();
+  pwm.setPWMFreq(50);
+  horizontalServo.attach(8); // Connect horizontal servo to pin 8
+  verticalServo.attach(9);   // Connect vertical servo to pin 9
+}
+
+void loop() {
+  int button1Reading = digitalRead(button1Pin);
+  int button2Reading = digitalRead(button2Pin);
+  int button3Reading = digitalRead(button3Pin);
+
+  if (button1Reading != lastButton1State) {
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (button1Reading != button1State) {
+      button1State = button1Reading;
+
+      if (button1State == HIGH) {
+        // Button 1 is pressed, change servo1Angle
+        if (servo1Angle == 90) {
+          servo1Angle = 180; // Toggle to the first position
+        } else {
+          servo1Angle = 90; // Toggle back to the starting point
+        }
+
+        if (servo2Angle == 90) {
+          servo2Angle = 360;
+        } else {
+          servo2Angle = 90;
+        }
+
+        if (servo3Angle == 90) {
+          servo3Angle = 270;
+        } else {
+          servo3Angle = 90;
+        }
+        pwm.setPWM(servo1Pin, 0, servo1Angle);
+        pwm.setPWM(servo2Pin, 0, servo2Angle);
+        pwm.setPWM(servo3Pin, 0, servo3Angle);
+      }
+    }
+  }
+
+  if (button2Reading != lastButton2State) {
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (button2Reading != button2State) {
+      button2State = button2Reading;
+
+      if (button2State == HIGH) {
+        // Button 2 is pressed, change servo2Angle
+        if (servo2Angle == 90) {
+          servo2Angle = 360; // Toggle to the first position
+        } else {
+          servo2Angle = 90; // Toggle back to the starting point
+        }
+        pwm.setPWM(servo2Pin, 0, servo2Angle);
+      }
+    }
+  }
+
+  if (button3Reading != lastButton3State) {
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (button3Reading != button3State) {
+      button3State = button3Reading;
+
+      if (button3State == HIGH) {
+        // Button 3 is pressed, change servo3Angle
+        if (servo3Angle == 120) {
+          servo3Angle = 240; // Toggle to the first position
+        } else {
+          servo3Angle = 120; // Toggle back to the starting point
+        }
+        pwm.setPWM(servo3Pin, 0, servo3Angle);
+      }
+    }
+  }
+
+  lastButton1State = button1Reading;
+  lastButton2State = button2Reading;
+  lastButton3State = button3Reading;
+
+  if (digitalRead(button4Pin) == LOW && !radarActive) {
+    startRadar();
+  }
+
+  if (radarActive) {
+    sweepRadar();
+  }
+}
+
+void startRadar() {
+  radarActive = true;
+  horizontalServo.write(horizontalAngle);
+  verticalServo.write(verticalAngle);
+  delay(1000); // Delay to stabilize the servos
+}
+
+void sweepRadar() {
+  int distance = sonar.ping_cm();
+  if (distance >= 0) {
+    // Process and display the distance as needed (e.g., send over serial or display on a screen)
+    // Example: Serial.println("Distance: " + String(distance) + " cm");
+  }
+  
+  // Increment the horizontal angle
+  horizontalAngle += 5;
+  if (horizontalAngle > 180) {
+    horizontalAngle = 0;
+    verticalAngle += 5;
+    if (verticalAngle > 90) {
+      verticalAngle = 0;
+      radarActive = false;
+    }
+  }
+  
+  // Update the servo positions
+  horizontalServo.write(horizontalAngle);
+  verticalServo.write(verticalAngle);
+  delay(30); // Delay to control the sweep speed
+}
